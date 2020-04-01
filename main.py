@@ -2,6 +2,8 @@
 Customized ResNet-9 Fast training with CIFAR10 dataset
 """
 import argparse
+import os
+import utils
 
 from core import *
 from torch_backend import *
@@ -11,6 +13,8 @@ from td import Conv2d_TD, Linear_TD, Conv2d_col_TD
 parser = argparse.ArgumentParser(description='resnet9 fast CIFAR10 training + Targeted Dropout')
 parser.add_argument('--epochs', type=int, default=24, 
                     help='number of epochs to train (default: 24)')
+parser.add_argument('--save_file', type=str, default=None,
+                    help='path to save file for model')
 parser.add_argument('--TD_gamma', type=float, default=0.0,
                     help='gamma value for targeted dropout')
 parser.add_argument('--TD_alpha', type=float, default=0.0,
@@ -61,9 +65,17 @@ def main():
         opts = [SGD(trainable_params(model).values(), {'lr': lr, 'weight_decay': Const(5e-4*batch_size), 'momentum': Const(0.9)})]
         logs, state = Table(), {MODEL: model, LOSS: x_ent_loss, OPTS: opts}
         for epoch in range(epochs):
+            weight_sparsity = utils.get_weight_sparsity(model)
             td_gamma, td_alpha = update_gamma_alpha(epoch, model)
-            logs.append(union({'epoch': epoch+1}, {'lr': lr_schedule(epoch+1)}, {'gamma': td_gamma}, {'alpha': td_alpha}, train_epoch(state, Timer(torch.cuda.synchronize), train_batches, valid_batches)))
+            logs.append(union({'epoch': epoch+1}, {'lr': lr_schedule(epoch+1)}, {'gamma': td_gamma}, {'alpha': td_alpha}, {'wspar': weight_sparsity}, train_epoch(state, Timer(torch.cuda.synchronize), train_batches, valid_batches)))
+            
     logs.df().query(f'epoch=={epochs}')[['train_acc', 'valid_acc']].describe()
+
+    if args.save_file is not None:
+        torch.save({
+            'state_dict': model.state_dict(),
+            'args': args}, 
+            os.path.join('checkpoint', args.save_file))
 
 def update_gamma_alpha(epoch, model):
     if args.TD_gamma_final > 0:

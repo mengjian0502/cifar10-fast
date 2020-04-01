@@ -2,8 +2,9 @@
 # Jupyter Notebook
 .ipynb_checkpoints
 data
-*.pyc
+checkpoint
+.pyc
 */*.pyc
 *./*.pth
 __pycache__
-*/__pycache__
+

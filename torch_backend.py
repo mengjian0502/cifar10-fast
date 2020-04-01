@@ -126,6 +126,7 @@ class Network(nn.Module):
     def __init__(self, net):
         super().__init__()
         self.graph = build_graph(net)
+        print(self.graph)
         for path, (val, _) in self.graph.items(): 
             setattr(self, path.replace('/', '_'), val)
     
