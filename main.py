@@ -6,7 +6,7 @@ import argparse
 from core import *
 from torch_backend import *
 from model import *
-from .td import Conv2d_TD, Linear_TD, Conv2d_col_TD
+from td import Conv2d_TD, Linear_TD, Conv2d_col_TD
 
 parser = argparse.ArgumentParser(description='resnet9 fast CIFAR10 training + Targeted Dropout')
 parser.add_argument('--TD_gamma', type=float, default=0.0,
@@ -54,12 +54,12 @@ def main():
     summaries = []
     for i in range(N_runs):
         print(f'Starting Run {i} at {localtime()}')
-        model = Network(net(gamma=args.TD_gamma, alpha=TD_alpha, block_size=args.block_size)).to(device).half()
+        model = Network(net(gamma=args.TD_gamma, alpha=args.TD_alpha, block_size=args.block_size)).to(device).half()
 
         opts = [SGD(trainable_params(model).values(), {'lr': lr, 'weight_decay': Const(5e-4*batch_size), 'momentum': Const(0.9)})]
         logs, state = Table(), {MODEL: model, LOSS: x_ent_loss, OPTS: opts}
         for epoch in range(epochs):
-            logs.append(union({'epoch': epoch+1}, train_epoch(state, Timer(torch.cuda.synchronize), train_batches, valid_batches)))
+            logs.append(union({'epoch': epoch+1}, {'lr': lr_schedule(epoch+1)}, train_epoch(state, Timer(torch.cuda.synchronize), train_batches, valid_batches)))
     logs.df().query(f'epoch=={epochs}')[['train_acc', 'valid_acc']].describe()
 
 def update_gamma_alpha(epoch):

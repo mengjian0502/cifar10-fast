@@ -1,9 +1,9 @@
 from core import *
 from torch_backend import *
-from .td import Conv2d_TD, Linear_TD, Conv2d_col_TD
+from td import Conv2d_TD, Linear_TD, Conv2d_col_TD
 
 # Network definition
-def conv_bn(c_in, c_out, gamma, alpha, block_size):
+def conv_bn(c_in, c_out, gamma=0.0, alpha=0.0, block_size=16):
     return {
         # 'conv': nn.Conv2d(c_in, c_out, kernel_size=3, stride=1, padding=1, bias=False), 
         'conv': Conv2d_TD(c_in, c_out, kernel_size=3, stride=1, padding=1, bias=False, gamma=gamma, alpha=alpha, block_size=block_size), 
