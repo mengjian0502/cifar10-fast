@@ -1,44 +1,30 @@
 """
 Customized ResNet-9 Fast training with CIFAR10 dataset
 """
+import argparse
 
 from core import *
 from torch_backend import *
+from model import *
+from .td import Conv2d_TD, Linear_TD, Conv2d_col_TD
 
-# Network definition
-def conv_bn(c_in, c_out):
-    return {
-        'conv': nn.Conv2d(c_in, c_out, kernel_size=3, stride=1, padding=1, bias=False), 
-        'bn': BatchNorm(c_out), 
-        'relu': nn.ReLU(True)
-    }
+parser = argparse.ArgumentParser(description='resnet9 fast CIFAR10 training + Targeted Dropout')
+parser.add_argument('--TD_gamma', type=float, default=0.0,
+                    help='gamma value for targeted dropout')
+parser.add_argument('--TD_alpha', type=float, default=0.0,
+                    help='alpha value for targeted dropout')
+parser.add_argument('--block_size', type=int, default=16,
+                    help='block size for dropout')
+parser.add_argument('--evaluate', type=str, default=None,
+                    help='model file for accuracy evaluation')
+parser.add_argument('--TD_gamma_final', type=float, default=-1.0,
+                    help='final gamma value for targeted dropout')
+parser.add_argument('--TD_alpha_final', type=float, default=-1.0,
+                    help='final alpha value for targeted dropout')
+parser.add_argument('--ramping_power', type=float, default=3.0,
+                    help='power of ramping schedule')
 
-def residual(c):
-    return {
-        'in': Identity(),
-        'res1': conv_bn(c, c),
-        'res2': conv_bn(c, c),
-        'add': (Add(), ['in', 'res2/relu']),
-    }
-
-def net(channels=None, weight=0.125, pool=nn.MaxPool2d(2), extra_layers=(), res_layers=('layer1', 'layer3')):
-    channels = channels or {'prep': 64, 'layer1': 128, 'layer2': 256, 'layer3': 512}
-    n = {
-        'input': (None, []),
-        'prep': conv_bn(3, channels['prep']),
-        'layer1': dict(conv_bn(channels['prep'], channels['layer1']), pool=pool),
-        'layer2': dict(conv_bn(channels['layer1'], channels['layer2']), pool=pool),
-        'layer3': dict(conv_bn(channels['layer2'], channels['layer3']), pool=pool),
-        'pool': nn.MaxPool2d(4),
-        'flatten': Flatten(),
-        'linear': nn.Linear(channels['layer3'], 10, bias=False),
-        'logits': Mul(weight),
-    }
-    for layer in res_layers:
-        n[layer]['residual'] = residual(channels[layer])
-    for layer in extra_layers:
-        n[layer]['extra'] = conv_bn(channels[layer], channels[layer])       
-    return n
+args = parser.parse_args()
 
 def main():
     DATA_DIR = './data'
@@ -59,7 +45,7 @@ def main():
     lr_schedule = PiecewiseLinear([0, 5, epochs], [0, 0.4, 0])
     batch_size = 512
     train_transforms = [Crop(32, 32), FlipLR(), Cutout(8, 8)]
-    N_runs = 3
+    N_runs = 1
 
     train_batches = DataLoader(Transform(train_set, train_transforms), batch_size, shuffle=True, set_random_choices=True, drop_last=True)
     valid_batches = DataLoader(valid_set, batch_size, shuffle=False, drop_last=False)
@@ -68,13 +54,30 @@ def main():
     summaries = []
     for i in range(N_runs):
         print(f'Starting Run {i} at {localtime()}')
-        model = Network(net()).to(device).half()
+        model = Network(net(gamma=args.TD_gamma, alpha=TD_alpha, block_size=args.block_size)).to(device).half()
+
         opts = [SGD(trainable_params(model).values(), {'lr': lr, 'weight_decay': Const(5e-4*batch_size), 'momentum': Const(0.9)})]
         logs, state = Table(), {MODEL: model, LOSS: x_ent_loss, OPTS: opts}
         for epoch in range(epochs):
             logs.append(union({'epoch': epoch+1}, train_epoch(state, Timer(torch.cuda.synchronize), train_batches, valid_batches)))
     logs.df().query(f'epoch=={epochs}')[['train_acc', 'valid_acc']].describe()
 
+def update_gamma_alpha(epoch):
+    if args.TD_gamma_final > 0:
+        TD_gamma = args.TD_gamma_final - (((args.epochs - 1 - epoch)/(args.epochs - 1)) ** args.ramping_power) * (args.TD_gamma_final - args.TD_gamma)
+        for m in model.modules():
+            if hasattr(m, 'gamma'):
+                m.gamma = TD_gamma
+    else:
+        TD_gamma = args.TD_gamma
+    if args.TD_alpha_final > 0:
+        TD_alpha = args.TD_alpha_final - (((args.epochs - 1 - epoch)/(args.epochs - 1)) ** args.ramping_power) * (args.TD_alpha_final - args.TD_alpha)
+        for m in model.modules():
+            if hasattr(m, 'alpha'):
+                m.alpha = TD_alpha
+    else:
+        TD_alpha = args.TD_alpha
+    return TD_gamma, TD_alpha
 
 if __name__ == '__main__':
     main()
