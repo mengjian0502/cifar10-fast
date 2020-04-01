@@ -56,7 +56,7 @@ def main():
     summaries = []
     for i in range(N_runs):
         print(f'Starting Run {i} at {localtime()}')
-        model = Network(net(gamma=args.TD_gamma, alpha=args.TD_alpha, block_size=args.block_size)).to(device).half()
+        model = Network(net(gamma=args.TD_gamma, alpha=args.TD_alpha, block_size=args.block_size)).to(device)
 
         opts = [SGD(trainable_params(model).values(), {'lr': lr, 'weight_decay': Const(5e-4*batch_size), 'momentum': Const(0.9)})]
         logs, state = Table(), {MODEL: model, LOSS: x_ent_loss, OPTS: opts}
