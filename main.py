@@ -61,11 +61,11 @@ def main():
         opts = [SGD(trainable_params(model).values(), {'lr': lr, 'weight_decay': Const(5e-4*batch_size), 'momentum': Const(0.9)})]
         logs, state = Table(), {MODEL: model, LOSS: x_ent_loss, OPTS: opts}
         for epoch in range(epochs):
-            td_gamma, td_alpha = update_gamma_alpha(epoch)
+            td_gamma, td_alpha = update_gamma_alpha(epoch, model)
             logs.append(union({'epoch': epoch+1}, {'lr': lr_schedule(epoch+1)}, {'gamma': td_gamma}, {'alpha': td_alpha}, train_epoch(state, Timer(torch.cuda.synchronize), train_batches, valid_batches)))
-    logs.df().query(f'epoch=={epochs}', f'lr=={lr_schedule(epoch+1)}', f'gamma=={td_gamma}', f'alpha=={td_alpha}')[['train_acc', 'valid_acc']].describe()
+    logs.df().query(f'epoch=={epochs}')[['train_acc', 'valid_acc']].describe()
 
-def update_gamma_alpha(epoch):
+def update_gamma_alpha(epoch, model):
     if args.TD_gamma_final > 0:
         TD_gamma = args.TD_gamma_final - (((args.epochs - 1 - epoch)/(args.epochs - 1)) ** args.ramping_power) * (args.TD_gamma_final - args.TD_gamma)
         for m in model.modules():
