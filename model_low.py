@@ -1,14 +1,19 @@
+from qtorch import BlockFloatingPoint, FixedPoint, FloatingPoint
+from qtorch.quant import quantizer, Quantizer
 from core import *
 from torch_backend import *
 from td import Conv2d_TD, Linear_TD, Conv2d_col_TD
 
 # Network definition
 def conv_bn_TD(c_in, c_out, gamma=0.0, alpha=0.0, block_size=16):
+    IBM_half = FloatingPoint(exp=6, man=9)
+    quant_half = Quantizer(IBM_half, IBM_half, "nearest", "nearest")
+
     return {
-        # 'conv': nn.Conv2d(c_in, c_out, kernel_size=3, stride=1, padding=1, bias=False), 
         'conv': Conv2d_TD(c_in, c_out, kernel_size=3, stride=1, padding=1, bias=False, gamma=gamma, alpha=alpha, block_size=block_size), 
         'bn': BatchNorm(c_out), 
-        'relu': nn.ReLU(True)
+        'relu': nn.ReLU(True),
+        'quant':
     }
 
 def conv_bn(c_in, c_out):

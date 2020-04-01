@@ -62,13 +62,18 @@ def main():
         print(f'Starting Run {i} at {localtime()}')
         model = Network(net(gamma=args.TD_gamma, alpha=args.TD_alpha, block_size=args.block_size)).to(device)
 
+        Hooks_input = utils.add_input_record_Hook(model)
         opts = [SGD(trainable_params(model).values(), {'lr': lr, 'weight_decay': Const(5e-4*batch_size), 'momentum': Const(0.9)})]
         logs, state = Table(), {MODEL: model, LOSS: x_ent_loss, OPTS: opts}
+        
+        activation_sparsity=0.0
         for epoch in range(epochs):
-            weight_sparsity = utils.get_weight_sparsity(model)
             td_gamma, td_alpha = update_gamma_alpha(epoch, model)
-            logs.append(union({'epoch': epoch+1}, {'lr': lr_schedule(epoch+1)}, {'gamma': td_gamma}, {'alpha': td_alpha}, {'wspar': weight_sparsity}, train_epoch(state, Timer(torch.cuda.synchronize), train_batches, valid_batches)))
             
+            weight_sparsity = utils.get_weight_sparsity(model)
+            logs.append(union({'epoch': epoch+1}, {'lr': lr_schedule(epoch+1)}, {'gamma': td_gamma}, {'alpha': td_alpha}, {'wspar': weight_sparsity}, {'aspar': round(activation_sparsity,4)}, train_epoch(state, Timer(torch.cuda.synchronize), train_batches, valid_batches)))
+            activation_sparsity = utils.get_activation_sparsity(Hooks_input).item()
+
     logs.df().query(f'epoch=={epochs}')[['train_acc', 'valid_acc']].describe()
 
     if args.save_file is not None:
