@@ -9,6 +9,8 @@ from model import *
 from td import Conv2d_TD, Linear_TD, Conv2d_col_TD
 
 parser = argparse.ArgumentParser(description='resnet9 fast CIFAR10 training + Targeted Dropout')
+parser.add_argument('--epochs', type=int, default=24, 
+                    help='number of epochs to train (default: 24)')
 parser.add_argument('--TD_gamma', type=float, default=0.0,
                     help='gamma value for targeted dropout')
 parser.add_argument('--TD_alpha', type=float, default=0.0,
@@ -41,7 +43,7 @@ def main():
     valid_set = list(zip(*preprocess(dataset['valid'], transforms).values()))
     print(f'Finished in {timer():.2} seconds')
 
-    epochs=24
+    epochs=args.epochs
     lr_schedule = PiecewiseLinear([0, 5, epochs], [0, 0.4, 0])
     batch_size = 512
     train_transforms = [Crop(32, 32), FlipLR(), Cutout(8, 8)]
