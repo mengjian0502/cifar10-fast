@@ -74,3 +74,7 @@ def main():
         for epoch in range(epochs):
             logs.append(union({'epoch': epoch+1}, train_epoch(state, Timer(torch.cuda.synchronize), train_batches, valid_batches)))
     logs.df().query(f'epoch=={epochs}')[['train_acc', 'valid_acc']].describe()
+
+
+if __name__ == '__main__':
+    main()
