@@ -21,8 +21,8 @@ def conv_bn(c_in, c_out):
 def residual(c):
     return {
         'in': Identity(),
-        'res1': conv_bn(c, c),
-        'res2': conv_bn(c, c),
+        'res1': conv_bn_TD(c, c),
+        'res2': conv_bn_TD(c, c),
         'add': (Add(), ['in', 'res2/relu']),
     }
 
@@ -42,5 +42,5 @@ def net(channels=None, weight=0.125, pool=nn.MaxPool2d(2), extra_layers=(), res_
     for layer in res_layers:
         n[layer]['residual'] = residual(channels[layer])
     for layer in extra_layers:
-        n[layer]['extra'] = conv_bn(channels[layer], channels[layer])       
+        n[layer]['extra'] = conv_bn(channels[layer], channels[layer], gamma=gamma, alpha=alpha, block_size=block_size)       
     return n
